@@ -216,10 +216,16 @@ func (c *cfClient) CreateTunnel(accountID, name string) (*cfTunnel, error) {
 }
 
 // TunnelToken 取已有隧道的 connector token（导入用）。
+// 注：Cloudflare 此接口 result 为纯字符串（不是对象）。
 func (c *cfClient) TunnelToken(accountID, tunnelID string) (string, error) {
 	raw, _, err := c.do("GET", "/accounts/"+accountID+"/cfd_tunnel/"+tunnelID+"/token", nil)
 	if err != nil {
 		return "", err
+	}
+	// result 可能是字符串，也可能是 {token: "..."}，两种都兼容
+	var s1 string
+	if err1 := json.Unmarshal(raw, &s1); err1 == nil && s1 != "" {
+		return s1, nil
 	}
 	var r struct {
 		Token string `json:"token"`
