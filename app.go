@@ -837,16 +837,24 @@ func (a *App) handleWMConfig(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 502, err.Error())
 		return
 	}
+	// web-manager 返回 {config:{httpPort,...}}，兼容两种格式
 	var j struct {
 		OK       bool `json:"ok"`
 		HTTPPort int  `json:"httpPort"`
+		Config   struct {
+			HTTPPort int `json:"httpPort"`
+		} `json:"config"`
 	}
 	if err := json.Unmarshal(b, &j); err != nil || !j.OK {
 		writeErr(w, 502, "web-manager 响应异常")
 		return
 	}
+	httpPort := j.HTTPPort
+	if httpPort == 0 && j.Config.HTTPPort > 0 {
+		httpPort = j.Config.HTTPPort
+	}
 	port, src := a.wmPort()
-	writeJSON(w, map[string]any{"ok": true, "httpPort": j.HTTPPort, "port": port, "source": src})
+	writeJSON(w, map[string]any{"ok": true, "httpPort": httpPort, "port": port, "source": src})
 }
 
 func (a *App) wmStatus() map[string]any {
