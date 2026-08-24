@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Cloudflare Tunnel 管理插件（IotaPanel 插件）
+name: cf-tunnel
+title: Cloudflare Tunnel
+version: 1.0.0
+author: IotaPanel 社区
+description: 免公网 IP/端口的全自动内网穿透：API 一键建隧道、域名映射（联动网站管理）、cloudflared 进程托管（掉线自动拉起）、优选 IP 测速与一键加速。纯 Go 零依赖，空闲常驻约 8MB。
+language: go
+command: bin/cf-tunnel
+bind: 127.0.0.1
+keepalive: true          # 需托管 cloudflared 进程（隧道 7x24 服务），插件本体极轻
+menus:
+  - title: CF Tunnel
+    icon: ⛅
+    path: /
+    section: tools

@@ -1,0 +1,17 @@
+# 编译产物
+bin/
+*.exe
+*.dll
+*.so
+
+# 开发临时
+dev/
+tmp/
+*.log
+hosts.bak.*
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloudflare Tunnel</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--fg:#1f2329;--muted:#86909c;--line:#e5e6eb;
+  --pri:#f6821f;--pri-h:#e0700f;--ok:#00b42a;--warn:#ff7d00;--err:#f53f3f;
+  --radius:8px;--shadow:0 1px 4px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#17171a;--card:#232326;--fg:#e8e8e9;--muted:#8f9095;--line:#3a3a3f;
+        --pri:#f6821f;--pri-h:#ff9a47;--shadow:0 1px 4px rgba(0,0,0,.3)}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:14px/1.6 -apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+.header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.header h1{font-size:19px;margin:0;flex:1}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:20px;
+  padding:3px 12px;font-size:12.5px;color:var(--muted);box-shadow:var(--shadow)}
+.chip b{color:var(--fg);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px}
+.dot.on{background:var(--ok)}.dot.off{background:var(--err)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+.card>h2{margin:0;padding:12px 16px;font-size:14.5px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:8px}
+.card>h2 .sp{flex:1}
+.card .inner{padding:14px 16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12.5px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(246,130,31,.04)}
+.empty{padding:36px 0;text-align:center;color:var(--muted)}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg);
+  border-radius:6px;padding:5px 12px;font-size:13px;transition:.15s}
+button:hover{border-color:var(--pri);color:var(--pri)}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+button.pri:hover{background:var(--pri-h);color:#fff}
+button.danger:hover{border-color:var(--err);color:var(--err)}
+button.mini{padding:2px 9px;font-size:12.5px}
+button:disabled{opacity:.5;cursor:not-allowed}
+.badge{display:inline-block;padding:1px 9px;border-radius:4px;font-size:12px;font-weight:500}
+.badge.run{color:var(--ok);background:rgba(0,180,42,.1)}
+.badge.stop{color:var(--err);background:rgba(245,63,63,.1)}
+.badge.dim{color:var(--muted);background:rgba(134,144,156,.12)}
+.badge.warn{color:var(--warn);background:rgba(255,125,0,.12)}
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:flex-start;justify-content:center;padding:5vh 16px;z-index:50}
+.mask.show{display:flex}
+.modal{background:var(--card);border-radius:10px;width:560px;max-width:100%;
+  max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.22)}
+.modal header{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.modal header h3{margin:0;font-size:15.5px;flex:1}
+.modal .x{border:none;background:none;font-size:18px;color:var(--muted);padding:0 4px}
+.modal .body{padding:16px 18px}
+.modal footer{display:flex;justify-content:flex-end;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;margin-bottom:5px;color:var(--muted)}
+.field input[type=text],.field input[type=number],.field input[type=password],.field select{
+  width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;
+  background:transparent;color:var(--fg);font:inherit}
+.field textarea{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;
+  background:transparent;color:var(--fg);font:13px/1.5 ui-monospace,Consolas,monospace;min-height:110px}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.hint a{color:var(--pri)}
+.warn-box{background:rgba(255,125,0,.08);border:1px solid rgba(255,125,0,.25);border-radius:6px;
+  padding:9px 12px;font-size:12.5px;color:var(--warn);margin-bottom:12px;display:none}
+.warn-box.show{display:block}
+.ok-box{background:rgba(0,180,42,.08);border:1px solid rgba(0,180,42,.25);border-radius:6px;
+  padding:9px 12px;font-size:12.5px;color:var(--ok);margin-bottom:12px;display:none}
+.ok-box.show{display:block}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kv{display:flex;gap:6px;font-size:13px;color:var(--muted)}
+.kv b{color:var(--fg);font-weight:600}
+.progress{height:8px;background:rgba(134,144,156,.15);border-radius:4px;overflow:hidden;margin:8px 0}
+.progress>i{display:block;height:100%;background:var(--pri);border-radius:4px;transition:width .3s}
+.toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%);z-index:99;
+  background:rgba(0,0,0,.82);color:#fff;padding:9px 18px;border-radius:8px;font-size:13.5px;
+  display:none;max-width:80vw}
+.toast.show{display:block}
+.toast.ok{background:rgba(0,140,40,.92)}
+.toast.err{background:rgba(200,40,40,.92)}
+.logbox{background:rgba(0,0,0,.04);border:1px solid var(--line);border-radius:6px;padding:10px;
+  font:12px/1.6 ui-monospace,Consolas,monospace;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.logbox .e{color:var(--err)}.logbox .i{color:var(--muted)}
+.tabs{display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.tabs button{border:none;border-radius:6px 6px 0 0;background:none;padding:7px 16px;font-size:13.5px;color:var(--muted)}
+.tabs button.act{color:var(--pri);box-shadow:inset 0 -2px 0 var(--pri)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);
+  border-top-color:var(--pri);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:4px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.step{display:flex;gap:10px;margin-bottom:14px;align-items:flex-start}
+.step .n{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(246,130,31,.12);
+  color:var(--pri);font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:center}
+.step .n.done{background:rgba(0,180,42,.12);color:var(--ok)}
+.step .c{flex:1;padding-top:2px}
+.step .c b{font-size:13.5px}
+.step .c p{margin:4px 0 6px;font-size:12.5px;color:var(--muted)}
+code.k{background:rgba(134,144,156,.12);border-radius:4px;padding:1px 6px;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>⛅ Cloudflare Tunnel</h1>
+    <button onclick="openSettings()">⚙️ 设置</button>
+    <button onclick="showLog()">📋 日志</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <!-- 引导 -->
+  <div class="card" id="guideCard">
+    <h2>🚀 三步上线（全自动）</h2>
+    <div class="inner" id="guideBody"></div>
+  </div>
+
+  <!-- 连接器 -->
+  <div class="card">
+    <h2>🛰️ cloudflared 连接器 <span class="sp"></span><span id="connBadge"></span></h2>
+    <div class="inner">
+      <div class="row" style="margin-bottom:10px" id="connBtns"></div>
+      <div class="kv" id="connInfo"></div>
+      <div id="installWrap" style="display:none">
+        <div class="progress"><i id="installBar" style="width:0%"></i></div>
+        <div class="hint" id="installText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 隧道与映射 -->
+  <div class="card">
+    <h2>🕳️ 隧道与域名映射 <span class="sp"></span>
+      <button class="mini" onclick="openTunnelModal()">＋ 新建 / 导入隧道</button>
+      <button class="mini danger" onclick="deleteTunnel()">删除隧道</button>
+    </h2>
+    <div class="inner">
+      <div class="kv" id="tunnelInfo" style="margin-bottom:12px"></div>
+      <table>
+        <thead><tr><th>公网域名</th><th>本地服务</th><th>Zone</th><th></th></tr></thead>
+        <tbody id="mapBody"></tbody>
+      </table>
+      <div class="empty" id="mapEmpty" style="display:none">还没有映射：点上面「＋ 新建 / 导入隧道」完成后，用下方按钮把网站管理的站点一键挂上来</div>
+      <div class="row" style="margin-top:12px">
+        <button class="pri" onclick="openMapModal()">＋ 添加映射（联动网站管理）</button>
+        <button onclick="openMapModal(true)">自定义映射</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 优选 IP -->
+  <div class="card">
+    <h2>⚡ 优选 IP（参考 CloudflareSpeedTest）</h2>
+    <div class="inner">
+      <div class="row" style="margin-bottom:10px">
+        <select id="spMode" style="padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)">
+          <option value="visitor">访客入口测速（443，含下载速度+机房）</option>
+          <option value="edge">隧道边缘测速（7844，仅延迟）</option>
+        </select>
+        <span class="kv">采样 <input type="number" id="spCount" value="128" min="10" max="400" style="width:70px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)"> 个 IP</span>
+        <button class="pri" id="spStartBtn" onclick="speedStart()">开始测速</button>
+        <button id="spStopBtn" style="display:none" onclick="speedStop()">停止</button>
+      </div>
+      <div class="progress" id="spBarWrap" style="display:none"><i id="spBar" style="width:0%"></i></div>
+      <div class="hint" id="spPhase"></div>
+      <div class="row" style="margin:10px 0">
+        <button onclick="applyEdge()">🚀 一键应用到隧道连接（/etc/hosts）</button>
+        <button onclick="removeEdge()">移除边缘优选</button>
+        <button onclick="exportHosts()">导出客户端 hosts 加速行</button>
+      </div>
+      <div class="kv" id="edgeInfo" style="margin-bottom:10px"></div>
+      <table>
+        <thead><tr><th>#</th><th>IP</th><th>平均延迟</th><th>下载速度</th><th>机房</th><th></th></tr></thead>
+        <tbody id="spBody"></tbody>
+      </table>
+      <div class="empty" id="spEmpty">尚未测速</div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置 -->
+<div class="mask" id="mSettings">
+  <div class="modal">
+    <header><h3>设置</h3><button class="x" onclick="closeAll()">×</button></header>
+    <div class="body">
+      <div class="field"><label>Cloudflare API Token</label>
+        <input type="password" id="setToken" placeholder="留空 = 不修改已保存的 Token">
+        <div class="hint">权限需含：Account·Cloudflare Tunnel·Edit ＋ Zone·DNS·Edit ＋ Zone·Zone·Read。
+          <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">去创建 Token →</a>（模板选「Edit Cloudflare Tunnel」再加两条 Zone 权限）</div>
+      </div>
+      <div class="field"><label>Cloudflare 账号</label>
+        <select id="setAccount"><option value="">验证 Token 后选择</option></select>
+        <div class="hint">点「验证」自动拉取</div>
+      </div>
+      <div class="field"><label>cloudflared 下载镜像（可选，国内加速）</label>
+        <input type="text" id="setMirror" placeholder="https://ghproxy.net">
+      </div>
+      <div class="field"><label>web-manager 端口（0 = 自动发现）</label>
+        <input type="number" id="setWmPort" value="0" min="0" max="65535">
+        <div class="hint" id="wmPortHint"></div>
+      </div>
+      <div class="ok-box" id="setOk"></div>
+      <div class="warn-box" id="setWarn"></div>
+    </div>
+    <footer>
+      <button onclick="closeAll()">取消</button>
+      <button onclick="verifyToken()">验证</button>
+      <button class="pri" onclick="saveSettings()">保存</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 新建/导入隧道 -->
+<div class="mask" id="mTunnel">
+  <div class="modal">
+    <header><h3>新建 / 导入隧道</h3><button class="x" onclick="closeAll()">×</button></header>
+    <div class="body">
+      <div class="tabs">
+        <button class="act" id="tabNew" onclick="tunnelTab('new')">新建（推荐）</button>
+        <button id="tabImp" onclick="tunnelTab('imp')">导入已有</button>
+      </div>
+      <div id="paneNew">
+        <div class="field"><label>隧道名称</label>
+          <input type="text" id="tunName" value="iotapanel" placeholder="任意，仅标识">
+          <div class="hint">将调用 Cloudflare API 创建隧道并自动启动连接器</div>
+        </div>
+      </div>
+      <div id="paneImp" style="display:none">
+        <div class="field"><label>选择已有隧道</label>
+          <select id="tunList"><option value="">刷新中…</option></select>
+          <div class="hint">导入后会接管其配置并读取现有映射</div>
+        </div>
+      </div>
+      <div class="warn-box" id="tunWarn"></div>
+    </div>
+    <footer>
+      <button onclick="closeAll()">取消</button>
+      <button class="pri" id="tunGo" onclick="tunnelGo()">创建 / 导入</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 添加映射 -->
+<div class="mask" id="mMap">
+  <div class="modal">
+    <header><h3>添加映射</h3><button class="x" onclick="closeAll()">×</button></header>
+    <div class="body">
+      <div class="tabs">
+        <button class="act" id="tabSite" onclick="mapTab('site')">联动网站管理（推荐）</button>
+        <button id="tabCustom" onclick="mapTab('custom')">自定义</button>
+      </div>
+      <div id="paneSite">
+        <div class="field"><label>选择站点</label>
+          <select id="mapSite" onchange="mapSiteChanged()"><option value="">加载中…</option></select>
+          <div class="hint" id="wmHint"></div>
+        </div>
+        <div class="field"><label>公网域名（需已托管在 Cloudflare）</label>
+          <select id="mapDomain"></select>
+          <div class="hint" id="mapDomainHint"></div>
+        </div>
+        <div class="field"><label>本地服务</label>
+          <input type="text" id="mapSvcSite" readonly>
+          <div class="hint">自动指向 web-manager 站点服务端口，Host 头透传做虚拟主机路由</div>
+        </div>
+      </div>
+      <div id="paneCustom" style="display:none">
+        <div class="field"><label>公网域名</label>
+          <input type="text" id="mapHost" placeholder="app.example.com">
+          <div class="hint">域名需托管在 Cloudflare（DNS 页可查到该域名）</div>
+        </div>
+        <div class="field"><label>本地服务</label>
+          <input type="text" id="mapSvc" placeholder="http://127.0.0.1:52088">
+          <div class="hint">支持 http:// https:// tcp:// ssh:// 等（如 ssh://localhost:22）</div>
+        </div>
+      </div>
+      <div class="warn-box" id="mapWarn"></div>
+    </div>
+    <footer>
+      <button onclick="closeAll()">取消</button>
+      <button class="pri" onclick="mapGo()">一键映射（配置+DNS）</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 日志 -->
+<div class="mask" id="mLog">
+  <div class="modal" style="width:720px">
+    <header><h3>cloudflared 日志</h3><button class="x" onclick="closeAll()">×</button></header>
+    <div class="body"><div class="logbox" id="logBox">加载中…</div></div>
+    <footer><button onclick="closeAll()">关闭</button><button onclick="loadLog()">刷新</button></footer>
+  </div>
+</div>
+
+<!-- hosts 导出 -->
+<div class="mask" id="mHosts">
+  <div class="modal">
+    <header><h3>客户端 hosts 加速行</h3><button class="x" onclick="closeAll()">×</button></header>
+    <div class="body">
+      <div class="hint" style="margin-bottom:8px">把下面几行写入你电脑的 hosts 文件（Windows：C:\Windows\System32\drivers\etc\hosts；macOS/Linux：/etc/hosts），访问映射域名即直连优选 IP（绕过默认解析）</div>
+      <textarea id="hostsBox" readonly></textarea>
+    </div>
+    <footer><button onclick="closeAll()">关闭</button><button class="pri" onclick="copyHosts()">复制</button></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+</body>
+<script>
+/* 工具 */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(msg,ok){const t=$('toast');t.textContent=msg;t.className='toast show '+(ok?'ok':'err');clearTimeout(t._h);t._h=setTimeout(()=>t.className='toast',3000)}
+function fmtDur(s){s=Math.max(0,s|0);const d=(s/86400)|0,h=((s%86400)/3600)|0,m=((s%3600)/60)|0;if(d)return d+'天'+h+'时';if(h)return h+'时'+m+'分';if(m)return m+'分'+(s%60)+'秒';return s+'秒'}
+async function api(method,path,body){
+  const opt={method,headers:{'Content-Type':'application/json'}};
+  if(body!==undefined)opt.body=JSON.stringify(body);
+  const r=await fetch(path,opt);
+  let j;try{j=await r.json()}catch(e){throw new Error('响应异常 '+r.status)}
+  if(!r.ok||j.ok===false)throw new Error(j.error||('请求失败 '+r.status));
+  return j;
+}
+function closeAll(){document.querySelectorAll('.mask').forEach(m=>m.classList.remove('show'))}
+document.querySelectorAll('.mask').forEach(m=>m.addEventListener('mousedown',e=>{if(e.target===m)closeAll()}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAll()});
+
+/* 全局状态 */
+let ST={},mappings=[],spTimer=null;
+
+/* ---------- 渲染 ---------- */
+async function refresh(){
+  try{
+    const j=await api('GET','api/status');
+    ST=j;
+    renderChips();renderGuide();renderConn();renderTunnel();
+    const m=await api('GET','api/mappings');mappings=m.mappings||[];
+    renderMappings();
+  }catch(e){toast(e.message)}
+}
+function renderChips(){
+  const c=[];
+  c.push(`<span class="chip"><span class="dot ${ST.tokenConfigured?'on':'off'}"></span>API Token ${ST.tokenConfigured?'已配置':'未配置'}</span>`);
+  if(ST.tunnel){
+    const ts=ST.tunnelStatus||{};
+    const alive=ts.connections>0;
+    c.push(`<span class="chip"><span class="dot ${alive?'on':'off'}"></span>隧道 ${esc(ST.tunnel.name)} · ${esc(ts.status||'?')} · ${ts.connections||0} 连接${(ts.colos&&ts.colos.length)?' · '+esc(ts.colos.join('/')):''}</span>`);
+  }else{c.push(`<span class="chip">隧道 <b>未创建</b></span>`)}
+  const cn=ST.connector||{};
+  c.push(`<span class="chip"><span class="dot ${cn.running?'on':'off'}"></span>cloudflared ${cn.running?`运行中 ${cn.rssKb?(cn.rssKb/1024).toFixed(1)+'MB':''}`:(cn.installed?'已停止':'未安装')}</span>`);
+  if(ST.wm)c.push(`<span class="chip">web-manager <b>:${ST.wm.port}</b> ${ST.wm.reachable?'✓':'不可达'}</span>`);
+  if(ST.edgeOpt&&ST.edgeOpt.applied)c.push(`<span class="chip">边缘优选 <b>已应用</b></span>`);
+  $('chips').innerHTML=c.join('');
+}
+function renderGuide(){
+  const cfgOk=ST.tokenConfigured,tunOk=!!ST.tunnel,cn=ST.connector||{};
+  const steps=[
+    {ok:cfgOk,t:'配置 Cloudflare API Token',p:'一个 Token 管全部：建隧道、写 DNS、改配置都不用进 Cloudflare 后台',act:cfgOk?'':'<button class="mini pri" onclick="openSettings()">去配置</button>'},
+    {ok:tunOk,t:'创建隧道并启动连接器',p:'一键创建远程托管隧道，cloudflared 自动下载并拉起（掉线自动重连）',act:tunOk?'':'<button class="mini pri" onclick="installAndTunnel()">一键完成</button>'},
+    {ok:mappings.length>0,t:'映射域名（联动网站管理）',p:'把 web-manager 里的站点域名一键挂上隧道：写 ingress + DNS CNAME 一步到位，之后 https://域名 直接访问，无需公网 80/443',act:''}
+  ];
+  $('guideBody').innerHTML=steps.map((s,i)=>`
+    <div class="step"><div class="n ${s.ok?'done':''}">${s.ok?'✓':i+1}</div>
+    <div class="c"><b>${esc(s.t)}</b><p>${esc(s.p)}</p>${s.act}</div></div>`).join('');
+  $('guideCard').style.display=(cfgOk&&tunOk&&mappings.length>0)?'none':'';
+}
+function renderConn(){
+  const cn=ST.connector||{},ins=cn.install||{};
+  $('connBadge').innerHTML=cn.running?'<span class="badge run">运行中</span>':(cn.installed?'<span class="badge stop">已停止</span>':'<span class="badge dim">未安装</span>');
+  let info=`<span>PID <b>${cn.running?cn.pid:'-'}</b></span><span>内存 <b>${cn.rssKb?(cn.rssKb/1024).toFixed(1)+'MB':'-'}</b></span><span>运行时长 <b>${cn.running?fmtDur(cn.uptime):'-'}</b></span>`;
+  if(cn.version)info+=`<span class="mono">${esc(cn.version)}</span>`;
+  if(cn.lastErr)info+=`<span style="color:var(--warn)">${esc(cn.lastErr)}</span>`;
+  $('connInfo').innerHTML=info;
+  const btns=[];
+  if(!cn.installed&&!ins.running)btns.push(`<button class="pri" onclick="install()">⬇️ 下载安装 cloudflared</button>`);
+  if(cn.installed){
+    if(cn.running){btns.push(`<button onclick="connOp('stop')">停止</button><button onclick="connOp('restart')">重启</button>`)}
+    else btns.push(`<button class="pri" onclick="connOp('start')">启动</button>`);
+  }
+  btns.push(`<button onclick="showLog()">查看日志</button>`);
+  $('connBtns').innerHTML=btns.join('');
+  const showIns=ins.running||ins.phase==='error';
+  $('installWrap').style.display=showIns?'block':'none';
+  if(showIns){
+    const pct=ins.total>0?Math.round(ins.bytes/ins.total*100):0;
+    $('installBar').style.width=(ins.phase==='error'?100:pct)+'%';
+    $('installText').textContent=ins.phase==='error'?'下载失败：'+ins.err:(ins.total>0?`下载中 ${pct}%（${(ins.bytes/1048576).toFixed(1)} / ${(ins.total/1048576).toFixed(1)} MB）`:`下载中 ${(ins.bytes/1048576).toFixed(1)} MB`);
+  }
+}
+function renderTunnel(){
+  if(!ST.tunnel){$('tunnelInfo').innerHTML='<span style="color:var(--muted)">未创建隧道</span>';return}
+  const ts=ST.tunnelStatus||{};
+  $('tunnelInfo').innerHTML=`<span>隧道 <b>${esc(ST.tunnel.name)}</b></span><span class="mono">${esc(ST.tunnel.id)}</span><span>状态 <b>${esc(ts.status||'?')}</b></span><span>活跃连接 <b>${ts.connections||0}</b></span>${ts.colos&&ts.colos.length?`<span>机房 <b>${esc(ts.colos.join(' / '))}</b></span>`:''}`;
+}
+function renderMappings(){
+  const tb=$('mapBody');
+  if(!mappings.length){$('mapEmpty').style.display='block';tb.innerHTML='';return}
+  $('mapEmpty').style.display='none';
+  tb.innerHTML=mappings.map(m=>`<tr>
+    <td><b>${esc(m.hostname)}</b></td><td class="mono">${esc(m.service)}</td>
+    <td>${esc(m.zoneName||'-')}</td>
+    <td><button class="mini danger" onclick="delMapping('${esc(m.hostname)}')">解除</button></td></tr>`).join('');
+}
+
+/* ---------- 引导一键 ---------- */
+async function installAndTunnel(){
+  if(!ST.tokenConfigured){openSettings();return}
+  const cn=ST.connector||{};
+  if(!cn.installed){
+    toast('开始下载 cloudflared…');
+    try{await api('POST','api/connector/install',{})}catch(e){toast(e.message);return}
+    const ok=await waitInstall();if(!ok)return;
+  }
+  openTunnelModal();
+}
+function waitInstall(){
+  return new Promise(res=>{
+    const t=setInterval(async()=>{
+      try{
+        const j=await api('GET','api/connector');
+        const ins=j.connector.install||{};
+        if(ins.phase==='done'){clearInterval(t);toast('cloudflared 安装完成',1);refresh();res(true)}
+        else if(ins.phase==='error'){clearInterval(t);toast('安装失败：'+ins.err);res(false)}
+      }catch(e){}
+    },1200);
+  });
+}
+async function install(){
+  try{await api('POST','api/connector/install',{});toast('开始下载…',1);refresh()}catch(e){toast(e.message)}
+}
+async function connOp(op){
+  try{await api('POST','api/connector/'+op,{});toast('已执行',1);refresh()}catch(e){toast(e.message)}
+}
+
+/* ---------- 设置 ---------- */
+function openSettings(){
+  $('setToken').value='';$('setWarn').className='warn-box';$('setOk').className='ok-box';
+  $('setAccount').innerHTML='<option value="">验证 Token 后选择</option>';
+  $('wmPortHint').textContent=ST.wm?`自动发现端口：${ST.wm.port}（${ST.wm.source}）`:'';
+  const s=async()=>{
+    try{
+      const j=await api('GET','api/settings');
+      $('setMirror').value=j.mirror||'';$('setWmPort').value=j.wmPort||0;
+      if(j.hasToken)$('setToken').placeholder='已保存（尾号 '+j.tokenTail+'），留空不修改';
+    }catch(e){}
+  };s();
+  $('mSettings').classList.add('show');
+}
+async function verifyToken(){
+  const token=$('setToken').value.trim();
+  if(!token&&!(ST.tokenConfigured)){toast('请先填写 Token');return}
+  $('setWarn').className='warn-box';$('setOk').className='ok-box';
+  try{
+    const j=await api('POST','api/cf/verify',{token:token||undefined});
+    $('setAccount').innerHTML=(j.accounts||[]).map(a=>`<option value="${esc(a.id)}">${esc(a.name)}（${esc(a.id.slice(0,8))}…）</option>`).join('')||'<option value="">该 Token 无可用账号</option>';
+    $('setOk').textContent=`✓ Token 有效：${(j.zones||[]).length} 个域名托管在 Cloudflare`+(j.zones&&j.zones.length?`（${j.zones.slice(0,5).map(z=>z.name).join('、')}${j.zones.length>5?'…':''}）`:'');
+    $('setOk').className='ok-box show';
+    $('setAccount').dataset.zones=JSON.stringify(j.zones||[]);
+  }catch(e){$('setWarn').textContent=e.message;$('setWarn').className='warn-box show'}
+}
+async function saveSettings(){
+  const body={mirror:$('setMirror').value.trim(),wmPort:parseInt($('setWmPort').value)||0};
+  const token=$('setToken').value.trim();
+  if(token)body.apiToken=token;
+  const acc=$('setAccount').value;
+  if(acc){body.accountId=acc;body.accountName=$('setAccount').selectedOptions[0].textContent.split('（')[0]}
+  try{await api('PUT','api/settings',body);toast('已保存',1);closeAll();refresh()}
+  catch(e){$('setWarn').textContent=e.message;$('setWarn').className='warn-box show'}
+}
+
+/* ---------- 隧道 ---------- */
+function openTunnelModal(){
+  if(!ST.tokenConfigured){toast('请先在设置里配置 API Token');openSettings();return}
+  $('tunWarn').className='warn-box';tunnelTab('new');$('mTunnel').classList.add('show');
+  loadTunnels();
+}
+async function loadTunnels(){
+  $('tunList').innerHTML='<option value="">加载中…</option>';
+  try{
+    const j=await api('GET','api/cf/tunnels');
+    $('tunList').innerHTML=(j.tunnels||[]).map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.status)} · ${t.connections}连接${t.current?'（当前）':''}</option>`).join('')||'<option value="">无已有隧道</option>';
+  }catch(e){$('tunList').innerHTML=`<option value="">加载失败：${esc(e.message)}</option>`}
+}
+function tunnelTab(t){
+  $('tabNew').className=t==='new'?'act':'';$('tabImp').className=t==='imp'?'act':'';
+  $('paneNew').style.display=t==='new'?'':'none';$('paneImp').style.display=t==='imp'?'':'none';
+}
+async function tunnelGo(){
+  const imp=!$('paneImp').style.display||$('paneImp').style.display==='none'?false:true;
+  $('tunWarn').className='warn-box';
+  try{
+    if(imp){
+      const id=$('tunList').value;if(!id){toast('请选择隧道');return}
+      const j=await api('POST','api/cf/tunnel/import',{tunnelId:id});
+      toast(`已导入隧道（${j.mappings} 条现有映射）`,1);
+    }else{
+      const name=$('tunName').value.trim()||'iotapanel';
+      const j=await api('POST','api/cf/tunnel',{name});
+      toast(j.started?'隧道已创建，连接器已启动':'隧道已创建（'+(j.needInstall?'需先安装 cloudflared':j.startErr||'连接器未启动')+'）',1);
+      if(j.needInstall){closeAll();install();return}
+    }
+    closeAll();refresh();
+  }catch(e){$('tunWarn').textContent=e.message;$('tunWarn').className='warn-box show'}
+}
+async function deleteTunnel(){
+  if(!ST.tunnel){toast('当前没有隧道');return}
+  if(!confirm('删除隧道将同时移除 '+mappings.length+' 条映射的 DNS 记录并停止连接器，确定？'))return;
+  try{await api('DELETE','api/cf/tunnel',{purgeDns:true});toast('已删除',1);refresh()}catch(e){toast(e.message)}
+}
+
+/* ---------- 映射 ---------- */
+let ZONES=[];
+function openMapModal(custom){
+  if(!ST.tunnel){toast('请先创建隧道');openTunnelModal();return}
+  $('mapWarn').className='warn-box';
+  mapTab(custom?'custom':'site');$('mMap').classList.add('show');
+  if(!custom)loadSites();
+}
+function mapTab(t){
+  $('tabSite').className=t==='site'?'act':'';$('tabCustom').className=t==='custom'?'act':'';
+  $('paneSite').style.display=t==='site'?'':'none';$('paneCustom').style.display=t==='custom'?'':'none';
+}
+async function loadSites(){
+  $('mapSite').innerHTML='<option value="">加载中…</option>';
+  try{
+    const [s,c]=await Promise.all([api('GET','api/wm/sites'),api('GET','api/wm/config')]);
+    const sites=s.sites||[];
+    $('wmHint').textContent=`web-manager 站点服务端口 ${c.httpPort}（发现方式：${c.source}）`;
+    if(!sites.length){$('mapSite').innerHTML='<option value="">web-manager 中暂无站点</option>';return}
+    $('mapSite').innerHTML=sites.map(x=>`<option value="${esc(x.id)}" data-domains='${esc(JSON.stringify(x.domains||[]))}'>${esc(x.name)}（${(x.domains||[]).length} 个域名）</option>`).join('');
+    mapSiteChanged();
+  }catch(e){
+    $('mapSite').innerHTML='<option value="">加载失败</option>';
+    $('wmHint').textContent=e.message;
+    $('mapWarn').textContent=e.message+'；可在「设置」手动指定 web-manager 端口，或用「自定义映射」';
+    $('mapWarn').className='warn-box show';
+  }
+}
+async function mapSiteChanged(){
+  const opt=$('mapSite').selectedOptions[0];if(!opt)return;
+  let domains=[];try{domains=JSON.parse(opt.dataset.domains||'[]')}catch(e){}
+  // 取 CF Zone 列表标注哪些域名可直接映射
+  try{
+    const z=await api('GET','api/cf/zones');ZONES=z.zones||[];
+  }catch(e){ZONES=[]}
+  const doms=domains.filter(d=>d.includes('.')&&!/^\d+\.\d+\.\d+\.\d+$/.test(d));
+  if(!doms.length){$('mapDomain').innerHTML='<option value="">该站点没有域名（只有 IP）—— 请先在网站管理里给站点绑定域名</option>';$('mapSvcSite').value='';return}
+  $('mapDomain').innerHTML=doms.map(d=>{
+    const z=ZONES.find(z=>d===z.name||d.endsWith('.'+z.name));
+    return `<option value="${esc(d)}">${esc(d)}${z?' ✓ 已托管 CF':' ✗ 未托管 CF（不可用）'}${z?'':' disabled'}</option>`;
+  }).join('');
+  domHint();
+}
+function domHint(){
+  const d=$('mapDomain').value;
+  const z=d?ZONES.find(z=>d===z.name||d.endsWith('.'+z.name)):null;
+  $('mapDomainHint').textContent=z?`属于 Zone ${z.name}，将自动创建 CNAME（橙云代理）`:'该域名不在 Cloudflare 托管的域名内，无法自动映射（先把域名 DNS 迁到 Cloudflare）';
+  const c=ST.wm; // 本地服务端口从 wmConfig 缓存拿
+  const port=window._wmHttpPort||52088;
+  $('mapSvcSite').value=`http://127.0.0.1:${port}`;
+}
+async function mapGo(){
+  const siteMode=!$('paneSite').style.display||$('paneSite').style.display==='none'?false:true;
+  siteMode?mapGoSite():mapGoCustom();
+}
+async function mapGoSite(){
+  const d=$('mapDomain').value;
+  if(!d){toast('请选择公网域名');return}
+  const z=ZONES.find(z=>d===z.name||d.endsWith('.'+z.name));
+  if(!z){toast('该域名未托管在 Cloudflare，无法映射');return}
+  try{
+    await api('POST','api/mappings',{hostname:d,service:$('mapSvcSite').value,siteId:$('mapSite').value});
+    toast('映射完成：ingress 已写入 + DNS CNAME 已创建',1);closeAll();refresh();
+  }catch(e){$('mapWarn').textContent=e.message;$('mapWarn').className='warn-box show'}
+}
+async function mapGoCustom(){
+  const h=$('mapHost').value.trim().toLowerCase(),svc=$('mapSvc').value.trim();
+  if(!h||!svc){toast('请填写完整');return}
+  try{
+    await api('POST','api/mappings',{hostname:h,service:svc});
+    toast('映射完成',1);closeAll();refresh();
+  }catch(e){$('mapWarn').textContent=e.message;$('mapWarn').className='warn-box show'}
+}
+async function delMapping(h){
+  if(!confirm('解除 '+h+' 的映射（删除 ingress 规则与 DNS 记录）？'))return;
+  try{await api('DELETE','api/mappings/'+encodeURIComponent(h));toast('已解除',1);refresh()}catch(e){toast(e.message)}
+}
+
+/* ---------- 日志 ---------- */
+async function showLog(){$('mLog').classList.add('show');loadLog()}
+async function loadLog(){
+  try{const j=await api('GET','api/connector/log');
+    $('logBox').innerHTML=(j.lines||[]).slice(-200).map(l=>{
+      const cls=/error|failed|fatal/i.test(l)?'e':'';
+      return `<div class="${cls}">${esc(l)}</div>`;
+    }).join('')||'（空）';
+  }catch(e){$('logBox').textContent=e.message}
+}
+
+/* ---------- 优选 IP ---------- */
+async function speedStart(){
+  const mode=$('spMode').value,count=parseInt($('spCount').value)||128;
+  const speedCount=mode==='visitor'?10:0;
+  try{await api('POST','api/speed',{mode,count,speedCount});toast('测速已开始',1);pollSpeed()}
+  catch(e){toast(e.message)}
+}
+async function speedStop(){try{await api('POST','api/speed/stop',{});toast('已停止',1)}catch(e){toast(e.message)}}
+function pollSpeed(){
+  if(spTimer)clearInterval(spTimer);
+  spTimer=setInterval(async()=>{
+    try{
+      const j=await api('GET','api/speed');
+      renderSpeed(j);
+      if(!j.running){clearInterval(spTimer);spTimer=null;refresh()}
+    }catch(e){}
+  },800);
+}
+function renderSpeed(j){
+  const run=j.running;
+  $('spStartBtn').style.display=run?'none':'';$('spStopBtn').style.display=run?'':'none';
+  if(run){
+    $('spBarWrap').style.display='';
+    const pct=j.total>0?Math.round(j.tested/j.total*100):0;
+    $('spBar').style.width=pct+'%';
+    $('spPhase').innerHTML=`<span class="spin"></span>${j.phase==='latency'?'阶段 1/2：TCP 延迟测速 '+j.tested+'/'+j.total:'阶段 2/2：对前 10 名测下载速度与机房'}（模式：${j.mode==='edge'?'隧道边缘 7844':'访客入口 443'}）`;
+  }else{
+    $('spBarWrap').style.display='none';
+    if(j.phase==='done')$('spPhase').textContent='测速完成（'+(j.results||[]).length+' 个可用 IP）';
+    else if(j.phase==='error')$('spPhase').textContent='失败：'+j.error;
+    else if(j.phase==='cancelled')$('spPhase').textContent='已取消';
+  }
+  const rs=j.results||[];
+  $('spEmpty').style.display=rs.length?'none':'';
+  $('spBody').innerHTML=rs.slice(0,30).map((r,i)=>`<tr>
+    <td>${i+1}</td><td class="mono"><b>${esc(r.ip)}</b></td>
+    <td>${r.latencyMs>0?r.latencyMs.toFixed(1)+' ms':'-'}</td>
+    <td>${r.speedMbps>0?r.speedMbps.toFixed(1)+' Mbps':'-'}</td>
+    <td>${esc(r.colo||'-')}</td>
+    <td><button class="mini" onclick="copyText('${esc(r.ip)}')">复制</button></td></tr>`).join('');
+  // 边缘优选状态
+  const e=ST.edgeOpt||{};
+  $('edgeInfo').innerHTML=e.applied?`<span>已应用边缘优选：<b class="mono">${(e.ips||[]).join(' / ')}</b></span>${e.appliedAt?`<span>于 ${new Date(e.appliedAt).toLocaleString()}</span>`:''}`:'<span style="color:var(--muted)">未应用边缘优选（应用后 cloudflared 将通过优选 IP 连接 Cloudflare 边缘）</span>';
+}
+async function applyEdge(){
+  const j=await api('GET','api/speed');
+  const rs=(j.results||[]).filter(r=>r.latencyMs>0);
+  if(!rs.length){toast('请先测速');return}
+  const ips=rs.slice(0,2).map(r=>r.ip);
+  if(!confirm(`把 ${ips.join(' / ')} 写入 /etc/hosts 作为隧道边缘连接 IP（region1/region2.v2.argotunnel.com），并重启 cloudflared？`))return;
+  try{const r=await api('POST','api/speed/apply-edge',{ips});toast('已应用'+(r.restarted?'并重启连接器':'（连接器未运行）'),1);refresh()}
+  catch(e){toast(e.message)}
+}
+async function removeEdge(){
+  if(!confirm('移除 /etc/hosts 中的边缘优选条目并重启连接器？'))return;
+  try{await api('POST','api/speed/remove-edge',{});toast('已移除',1);refresh()}catch(e){toast(e.message)}
+}
+async function exportHosts(){
+  try{
+    const j=await api('GET','api/speed/hosts-export?count=3');
+    if(!(j.lines||[]).length){toast('请先测速并添加映射');return}
+    $('hostsBox').value=j.lines.join('\n');
+    $('mHosts').classList.add('show');
+  }catch(e){toast(e.message)}
+}
+function copyText(t){
+  navigator.clipboard.writeText(t).then(()=>toast('已复制：'+t,1)).catch(()=>toast(t));
+}
+function copyHosts(){
+  navigator.clipboard.writeText($('hostsBox').value).then(()=>toast('已复制',1)).catch(()=>{});
+}
+
+/* ---------- 启动 ---------- */
+(async function(){
+  // 缓存 wm 端口给默认服务地址
+  try{const c=await api('GET','api/wm/config');window._wmHttpPort=c.httpPort}catch(e){}
+  await refresh();
+  const j=await api('GET','api/speed');renderSpeed(j);
+  if(j.running)pollSpeed();
+  // 下载进行中则轮询
+  const cn=ST.connector||{};
+  if((cn.install||{}).running)waitInstall();
+  setInterval(refresh,5000);
+})();
+</script>
+</html>
