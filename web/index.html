@@ -530,6 +530,7 @@ async function loadSites(){
   try{
     const [s,c]=await Promise.all([api('GET','api/wm/sites'),api('GET','api/wm/config')]);
     const sites=s.sites||[];
+    if(c.httpPort)window._wmHttpPort=c.httpPort; // 供 domHint() 生成正确的本地服务地址
     $('wmHint').textContent=`web-manager 站点服务端口 ${c.httpPort}（发现方式：${c.source}）`;
     if(!sites.length){$('mapSite').innerHTML='<option value="">web-manager 中暂无站点</option>';return}
     $('mapSite').innerHTML=sites.map(x=>`<option value="${esc(x.id)}" data-domains='${esc(JSON.stringify(x.domains||[]))}'>${esc(x.name)}（${(x.domains||[]).length} 个域名）</option>`).join('');
@@ -565,12 +566,13 @@ function domHint(){
   $('mapSvcSite').value=`http://127.0.0.1:${port}`;
 }
 async function mapGo(){
-  const siteMode=!$('paneSite').style.display||$('paneSite').style.display==='none'?false:true;
+  const siteMode=$('paneSite').style.display!=='none';
   siteMode?mapGoSite():mapGoCustom();
 }
 async function mapGoSite(){
   const d=$('mapDomain').value;
   if(!d){toast('请选择公网域名');return}
+  if(!$('mapSvcSite').value){toast('本地服务地址为空，请检查 web-manager 端口设置');return}
   const z=ZONES.find(z=>d===z.name||d.endsWith('.'+z.name));
   if(!z){toast('该域名未托管在 Cloudflare，无法映射');return}
   try{
